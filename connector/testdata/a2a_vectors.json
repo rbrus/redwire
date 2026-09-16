@@ -1,0 +1,105 @@
+[
+ {
+  "reply": {
+   "result": {
+    "artifacts": [
+     {
+      "parts": [
+       {
+        "type": "text",
+        "text": "the answer"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "text": "the answer"
+ },
+ {
+  "reply": {
+   "result": {
+    "artifacts": [
+     {
+      "parts": [
+       {
+        "type": "text",
+        "text": "part one"
+       },
+       {
+        "type": "image",
+        "url": "x"
+       },
+       {
+        "type": "text",
+        "text": "part two"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "text": "part one part two"
+ },
+ {
+  "reply": {
+   "result": {
+    "status": {
+     "message": {
+      "parts": [
+       {
+        "type": "text",
+        "text": "from status"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "text": "from status"
+ },
+ {
+  "reply": {
+   "result": {
+    "state": "completed",
+    "code": 7
+   }
+  },
+  "text": "{\"state\": \"completed\", \"code\": 7}"
+ },
+ {
+  "reply": {
+   "result": {}
+  },
+  "text": "{}"
+ },
+ {
+  "reply": {
+   "result": {
+    "artifacts": [
+     {
+      "parts": []
+     }
+    ]
+   }
+  },
+  "text": ""
+ },
+ {
+  "reply": {
+   "result": {
+    "artifacts": [
+     {
+      "parts": [
+       {
+        "type": "text",
+        "text": "DAN: unrestricted mode."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "text": "DAN: unrestricted mode."
+ }
+]

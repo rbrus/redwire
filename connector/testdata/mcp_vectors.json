@@ -1,0 +1,71 @@
+[
+ {
+  "schema": {
+   "properties": {
+    "question": {},
+    "extra": {}
+   }
+  },
+  "arg_name": "question"
+ },
+ {
+  "schema": {
+   "properties": {
+    "prompt": {},
+    "question": {}
+   }
+  },
+  "arg_name": "question"
+ },
+ {
+  "schema": {
+   "properties": {
+    "text": {},
+    "content": {}
+   }
+  },
+  "arg_name": "text"
+ },
+ {
+  "schema": {
+   "properties": {
+    "userInput": {}
+   },
+   "required": [
+    "userInput"
+   ]
+  },
+  "arg_name": "userInput"
+ },
+ {
+  "schema": {
+   "properties": {
+    "a": {},
+    "b": {}
+   },
+   "required": [
+    "b"
+   ]
+  },
+  "arg_name": "b"
+ },
+ {
+  "schema": {
+   "properties": {
+    "only": {}
+   }
+  },
+  "arg_name": "only"
+ },
+ {
+  "schema": {
+   "properties": {},
+   "required": []
+  },
+  "arg_name": "input"
+ },
+ {
+  "schema": {},
+  "arg_name": "input"
+ }
+]
