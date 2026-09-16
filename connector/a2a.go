@@ -15,13 +15,19 @@ import (
 )
 
 // A2A reaches an agent that speaks Agent-to-Agent: task-based message exchange over JSON-RPC, with
-// discovery via an Agent Card at /.well-known/agent-card.json (agent.json before spec 0.3; the
-// both are read at discovery).
+// discovery via an Agent Card at /.well-known/agent-card.json (agent.json before spec 0.3; both are
+// read at discovery).
 //
 // Like MCP it is JSON-RPC over HTTP, but the shape is different: a message is a `tasks/send` with a
 // role and typed parts, and the reply nests the answer three ways. The extraction below reproduces
 // that layering exactly, because a red-team judge reads whatever it returns and a wrong extraction
 // changes what a scan records as the target's answer.
+//
+// The Agent Card is read for one thing only — the endpoint and the auth scheme it declares — and its
+// free-text fields (description, skills) are never routed to a model. That is deliberate: a hostile
+// server can plant instructions in those fields (the Agent Card injection class, A2A-2026-001), and
+// a client that hands card text to its own LLM lets a target attack the scanner. Here the card is
+// data, not instructions.
 type A2A struct {
 	endpoint string
 	auth     Auth

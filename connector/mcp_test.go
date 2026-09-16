@@ -97,6 +97,57 @@ func TestMCPSendsThePayloadIntoTheRightArgument(t *testing.T) {
 	}
 }
 
+// The 2026-07-28 Streamable HTTP transport routes on headers, so a call that omits them reaches an
+// older server but is refused or misrouted by a modern gateway — a silent way to scan nothing. This
+// pins that tools/call carries the protocol version and the Mcp-Method / Mcp-Name routing pair, and
+// that tools/list (which has no target) sends Mcp-Method but no empty Mcp-Name.
+func TestMCPSendsTheStreamableHTTPRoutingHeaders(t *testing.T) {
+	type hdr struct{ proto, method, name, accept string }
+	seen := map[string]hdr{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+			ID     string `json:"id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		seen[req.Method] = hdr{
+			proto:  r.Header.Get("MCP-Protocol-Version"),
+			method: r.Header.Get("Mcp-Method"),
+			name:   r.Header.Get("Mcp-Name"),
+			accept: r.Header.Get("Accept"),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method {
+		case "tools/list":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":"` + req.ID + `","result":{"tools":[{"name":"ask","inputSchema":{"properties":{"input":{}}}}]}}`))
+		case "tools/call":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":"` + req.ID + `","result":{"content":[{"type":"text","text":"ok"}]}}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	if _, err := NewMCP(srv.URL, Auth{Type: AuthNone}, loopbackClient()).Send(context.Background(), "payload"); err != nil {
+		t.Fatal(err)
+	}
+
+	list, call := seen["tools/list"], seen["tools/call"]
+	if call.proto != "2026-07-28" || list.proto != "2026-07-28" {
+		t.Errorf("MCP-Protocol-Version missing: list=%q call=%q", list.proto, call.proto)
+	}
+	if !strings.Contains(call.accept, "text/event-stream") {
+		t.Errorf("Accept must offer the SSE stream, got %q", call.accept)
+	}
+	if call.method != "tools/call" || call.name != "ask" {
+		t.Errorf("tools/call routing headers wrong: method=%q name=%q", call.method, call.name)
+	}
+	if list.method != "tools/list" {
+		t.Errorf("tools/list must send Mcp-Method, got %q", list.method)
+	}
+	if list.name != "" {
+		t.Errorf("tools/list has no target, so Mcp-Name must be absent, got %q", list.name)
+	}
+}
+
 func TestAToolErrorIsEvidenceNotAFailure(t *testing.T) {
 	// A tool refusing is what a guardrail test looks like succeeding.
 	tools := []map[string]any{{"name": "ask", "inputSchema": map[string]any{

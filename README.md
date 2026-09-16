@@ -23,7 +23,7 @@ type Target interface {
 | Transport   | Reaches                                                      | Constructor        |
 |-------------|-------------------------------------------------------------|--------------------|
 | `rest`      | An HTTP/JSON agent, with configurable request/response paths | `connector.NewREST`     |
-| `mcp`       | A tool exposed over the Model Context Protocol               | `connector.NewMCP`      |
+| `mcp`       | A tool over the Model Context Protocol (2026-07-28 Streamable HTTP) | `connector.NewMCP`      |
 | `a2a`       | An agent speaking Agent-to-Agent (JSON-RPC, Agent Card)      | `connector.NewA2A`      |
 | `ws`        | A persistent WebSocket chat gateway (multi-turn session)     | `connector.NewWebSocket`|
 | `browser`   | A chat widget on a real page, driven over the Chrome DevTools Protocol | `connector.NewBrowser`  |

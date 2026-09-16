@@ -13,10 +13,13 @@ import (
 
 // MCP reaches an agent exposed over the Model Context Protocol.
 //
-// A limitation worth stating rather than quietly hiding: it sends bare JSON-RPC with no `initialize`
-// handshake. The MCP revision of 2026-07-28 changed the protocol substantially (the handshake and
-// Mcp-Session-Id removed, server/discover added, RFC 9207 iss validation mandatory), so a strict
-// modern server may reject this. Wiring the handshake is the natural next step.
+// It speaks the 2026-07-28 Streamable HTTP transport: stateless (no Mcp-Session-Id), with the
+// MCP-Protocol-Version and the Mcp-Method / Mcp-Name routing headers on every request so a modern
+// gateway can place a call without parsing its body. See rpc.
+//
+// One limitation stated rather than hidden: it does not perform the `initialize` handshake, and sends
+// its first tools/list cold. Against a server that mandates the handshake before any other method
+// this will be refused; wiring it is the natural next step. Everything else on the wire is current.
 type MCP struct {
 	endpoint string
 	auth     Auth
@@ -41,7 +44,19 @@ func NewMCP(endpoint string, auth Auth, client *http.Client) *MCP {
 	return &MCP{endpoint: endpoint, auth: auth, client: client}
 }
 
-func (m *MCP) rpc(ctx context.Context, method string, params any) (json.RawMessage, error) {
+// mcpProtocolVersion is the spec revision this connector negotiates. Sent as MCP-Protocol-Version on
+// every request so a 2026-07-28 server routes it correctly; older servers ignore an unknown header.
+const mcpProtocolVersion = "2026-07-28"
+
+// rpc sends one JSON-RPC call. name is the operation's target (a tool name for tools/call, empty for
+// list-style methods) and rides in the Mcp-Name routing header.
+//
+// The 2026-07-28 Streamable HTTP transport routes on headers, not the body: a gateway or rate-limiter
+// decides where a call goes from Mcp-Method and Mcp-Name (SEP-2243) without parsing JSON. Sending
+// them costs nothing against an older server — an unknown header is ignored — and is required to
+// reach a modern one, so they go on unconditionally. Mcp-Name is omitted when there is no target,
+// because an empty routing key is not the same as "route the search tool".
+func (m *MCP) rpc(ctx context.Context, method, name string, params any) (json.RawMessage, error) {
 	m.nextID++
 	body := map[string]any{"jsonrpc": "2.0", "id": fmt.Sprint(m.nextID), "method": method}
 	if params != nil {
@@ -56,6 +71,14 @@ func (m *MCP) rpc(ctx context.Context, method string, params any) (json.RawMessa
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// Streamable HTTP: a reply may come back as JSON or as an SSE stream, and the routing headers
+	// let infrastructure place the request without reading its body.
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("MCP-Protocol-Version", mcpProtocolVersion)
+	req.Header.Set("Mcp-Method", method)
+	if name != "" {
+		req.Header.Set("Mcp-Name", name)
+	}
 	switch m.auth.Type {
 	case AuthBearer:
 		req.Header.Set("Authorization", "Bearer "+m.auth.Token)
@@ -95,7 +118,7 @@ func (m *MCP) rpc(ctx context.Context, method string, params any) (json.RawMessa
 
 // DiscoverTools lists the tools the server exposes, caching them for Send.
 func (m *MCP) DiscoverTools(ctx context.Context) ([]MCPTool, error) {
-	result, err := m.rpc(ctx, "tools/list", nil)
+	result, err := m.rpc(ctx, "tools/list", "", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +170,7 @@ func ArgNameFor(inputSchema map[string]any) string {
 
 // CallTool invokes one tool and returns its textual content.
 func (m *MCP) CallTool(ctx context.Context, name string, args map[string]any) (string, error) {
-	result, err := m.rpc(ctx, "tools/call", map[string]any{"name": name, "arguments": args})
+	result, err := m.rpc(ctx, "tools/call", name, map[string]any{"name": name, "arguments": args})
 	if err != nil {
 		return "", err
 	}
