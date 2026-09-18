@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/rbrus/redwire.svg)](https://pkg.go.dev/github.com/rbrus/redwire)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rbrus/redwire)](https://goreportcard.com/report/github.com/rbrus/redwire)
 [![CI](https://github.com/rbrus/redwire/actions/workflows/ci.yml/badge.svg)](https://github.com/rbrus/redwire/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Reach an AI agent behind any of five transports through one Go interface.
 
@@ -122,4 +122,8 @@ the SSRF design, and the behavioural test suite came with them.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE): a redistribution or a derivative
+work carries both with it.
+
+Up to and including commit `c233dbd` (2026-09-16) redwire was published under the MIT License, and
+those revisions remain available under it.

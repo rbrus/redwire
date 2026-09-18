@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Tests for the MCP transport: the argument-name selection differentially against Python, and the
 // JSON-RPC round trip against a real httptest server.
 //

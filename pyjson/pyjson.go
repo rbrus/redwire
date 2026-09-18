@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Package pyjson writes JSON the way Python's json.dumps does.
 //
 // Python's default separators are ", " and ": ", Go's encoder is compact, and both are valid JSON —

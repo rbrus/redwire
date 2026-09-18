@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // The guarded client, tested as the two attacks a validate-then-dial guard does not survive:
 // a name that rebinds between the check and the connect, and a 302 into the internal network.
 package ssrf

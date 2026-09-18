@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 package redwire_test
 
 import (

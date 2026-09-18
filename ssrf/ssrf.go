@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Package ssrf is the guard on every outbound URL a caller supplies.
 //
 // One blocklist and one resolution rule, shared by everything that dials a caller-supplied endpoint:

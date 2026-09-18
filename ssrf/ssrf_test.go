@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // The SSRF guard, tested as the attacks it exists to refuse rather than as a function that returns
 // errors. A blocklist with a hole in it looks exactly like one without.
 package ssrf

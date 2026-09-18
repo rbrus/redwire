@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Package redwire reaches an AI agent behind any of five transports through one interface.
 //
 // A red-team's payload does not care whether the agent answers over REST, MCP, A2A, a WebSocket, or

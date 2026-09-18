@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Behavioural tests for the REST transport.
 //
 // These pin the status-code policy that is easy to "fix" wrongly: when red-teaming, a target's 4xx

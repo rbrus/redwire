@@ -1,3 +1,5 @@
+// Copyright 2026 Radoslaw Brus. SPDX-License-Identifier: Apache-2.0
+
 // Tests for the A2A transport: the layered response extraction differentially against Python, and
 // the JSON-RPC task round trip against a real httptest server.
 //
