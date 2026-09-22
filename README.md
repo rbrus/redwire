@@ -120,6 +120,13 @@ These packages were extracted from a larger agentic-AI red-teaming engine and pu
 because the transport layer is useful without the rest of it. The standard-library-first discipline,
 the SSRF design, and the behavioural test suite came with them.
 
+## Ecosystem
+
+`redwire` serves as the multi-transport connectivity backbone across the open agent security lab:
+
+* **[agent-probe](https://github.com/rbrus/agent-probe)** — Autonomous AI agent security scanner & red-teaming CLI (OWASP Top 10 for LLMs / Excessive Agency).
+* **[adk-demo-target](https://github.com/rbrus/adk-demo-target)** — Atlas: a deliberately attackable Google ADK reference banking agent with 3 defense tiers (`none` | `basic` | `hardened`).
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE): a redistribution or a derivative
