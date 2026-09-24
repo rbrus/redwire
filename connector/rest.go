@@ -27,18 +27,19 @@ import (
 // AuthType is the authentication scheme a target uses.
 type AuthType string
 
+// The supported authentication schemes. The zero value ("") behaves like AuthNone.
 const (
-	AuthNone   AuthType = "none"
-	AuthBearer AuthType = "bearer"
-	AuthAPIKey AuthType = "api_key"
+	AuthNone   AuthType = "none"    // no credential is sent
+	AuthBearer AuthType = "bearer"  // "Authorization: Bearer <Token>"
+	AuthAPIKey AuthType = "api_key" // "<APIKeyHeader>: <APIKeyValue>"
 )
 
 // Auth describes how to authenticate to the target.
 type Auth struct {
 	Type         AuthType `json:"type"`
-	Token        string   `json:"token,omitempty"`
-	APIKeyHeader string   `json:"api_key_header,omitempty"`
-	APIKeyValue  string   `json:"api_key_value,omitempty"`
+	Token        string   `json:"token,omitempty"`          // used by AuthBearer
+	APIKeyHeader string   `json:"api_key_header,omitempty"` // header name used by AuthAPIKey
+	APIKeyValue  string   `json:"api_key_value,omitempty"`  // header value used by AuthAPIKey
 }
 
 // Mapping is a dotted path into the request or response body, e.g. "input.text" or
@@ -62,7 +63,7 @@ type Config struct {
 	Auth            Auth          `json:"auth"`
 	RequestMapping  Mapping       `json:"request_mapping"`
 	ResponseMapping Mapping       `json:"response_mapping"`
-	Timeout         time.Duration `json:"-"`
+	Timeout         time.Duration `json:"-"` // per-request timeout; zero means 30s
 }
 
 // REST sends attack payloads to an HTTP target and returns what it said back.

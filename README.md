@@ -10,7 +10,7 @@ Reach an AI agent behind any of five transports through one Go interface.
 A red-team payload does not care whether the agent answers over REST, MCP, A2A, a WebSocket, or a
 chat widget in a browser. `redwire` makes that indifference concrete: every connector satisfies one
 `Send` interface, so an attack is written once and runs against all five — with SSRF protection on
-by default and no third-party runtime dependencies beyond `gorilla/websocket`.
+by default and only two third-party runtime dependencies: `gorilla/websocket` and `google/uuid`.
 
 ```go
 type Target interface {
@@ -44,12 +44,15 @@ payload reaches the page as a JSON literal, never by string concatenation.
   copies every other header verbatim and, on a 307/308, replays the request body. An API-key target
   sends its credential under a header *you* named, and the body is your payload — so a single
   `307 -> https://attacker.example/collect` from a compromised target would hand over both. The
-  guard refuses any redirect that leaves the host. See `ssrf.CheckSameHostRedirect` and
-  `connector/dial_test.go`.
+  guard refuses any redirect that leaves the host (a port change and the exact apex<->`www.` pair
+  are the only exceptions). See `ssrf.CheckSameHostRedirect` and `connector/dial_test.go`.
 - **A refusal is evidence, not a failure.** When you are red-teaming, a target's `4xx` is usually
-  the *result* — a content filter firing is exactly what you came to observe. Only auth rejections
-  (401/403) are errors; everything else is captured as text. A connector that raised on `4xx` would
-  silently turn every successful guardrail into an aborted run.
+  the *result* — a content filter firing is exactly what you came to observe. So a `400` or `422` is
+  returned as the reply (prefixed `[TARGET REJECTED <status>]`), not as an error. What *is* an error
+  is a status that means nobody answered: an auth rejection (401/403, as `*connector.AuthError`),
+  `404`/`405` (no agent at that path), `429` (throttled), and any `5xx`. A connector that raised on
+  every `4xx` would silently turn every successful guardrail into an aborted run; one that returned a
+  gateway error page as the agent's words would score noise as evidence.
 - **A widget that can't be found is an error, never an empty reply.** A page with no chat box and a
   bot that refused to answer are opposite results; the browser connector never lets them look alike.
 
@@ -72,10 +75,14 @@ go get github.com/rbrus/redwire
 
 ```go
 import (
+        "context"
+        "os"
+
         "github.com/rbrus/redwire"
         "github.com/rbrus/redwire/connector"
 )
 
+ctx := context.Background()
 auth := connector.Auth{Type: connector.AuthBearer, Token: os.Getenv("AGENT_TOKEN")}
 
 var target redwire.Target = connector.NewREST(connector.Config{
@@ -108,11 +115,25 @@ reply, err := b.Send(ctx, payload)
 go test -race ./...
 ```
 
-85 tests, roughly one line of test per line of code. They assert on *behaviour* — an httptest
+86 tests plus a runnable example, roughly one line of test per line of code. They assert on *behaviour* — an httptest
 target that returns a 502, a target that redirects to another host, a WebSocket that drops
 mid-conversation — not on struct internals. The browser connector's live test drives a real
 Chromium and skips loudly when `REDWIRE_CDP_URL` is unset, because that is the only thing that proves
 the page-side JavaScript.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR, run what CI runs:
+
+```bash
+gofmt -l .          # must print nothing
+go vet ./...
+go test -race ./...
+```
+
+Keep the standard-library-first discipline (a new dependency needs a reason), add a behavioural test
+for any change in what a connector reports, and note that contributions are accepted under the
+Apache License 2.0.
 
 ## Provenance
 

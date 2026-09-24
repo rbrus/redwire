@@ -22,9 +22,8 @@ import (
 // answering, so a send re-dials once before reporting failure.
 //
 // gorilla/websocket rather than a hand-rolled client: this is a security product, and implementing
-// frame masking and continuation by hand is more attack surface than a vetted library. It is
-// already in the module graph (a transitive dependency of ADK), so this adds no new module — it
-// only promotes one to direct.
+// frame masking and continuation by hand is more attack surface than a vetted library. It is also
+// the one dependency the browser connector reuses to speak CDP, so it earns its place twice.
 type WebSocket struct {
 	url     string
 	auth    Auth

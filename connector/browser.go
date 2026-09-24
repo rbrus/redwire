@@ -19,8 +19,8 @@ import (
 // assistant, an embedded product bot, a demo chat behind a cookie banner.
 //
 // The one thing this file gets right, or the rest does not matter: it is a Target like any other. It
-// satisfies engine.Target with a Send that takes a string and returns a string, so all
-// <!--STAT--> techniques, both scan phases and every judge run against a widget unchanged and
+// satisfies redwire.Target with a Send that takes a string and returns a string, so every
+// technique, scan phase and judge built on that interface runs against a widget unchanged and
 // without knowing the transport is a browser. A connector that needed its own technique set would be
 // a second product.
 //
@@ -51,7 +51,7 @@ type Browser struct {
 //
 // Sharing rather than a tab each, for two reasons that point the same way. A scan builds a connector
 // per agent — connectorFromConfig is called per task — so a tab each means a tab per agent per round,
-// and nothing in engine.Target has a Close for them to be released by: a real scan left tabs open until
+// and nothing in redwire.Target has a Close for them to be released by: a real scan left tabs open until
 // Chrome ran out of memory, which is how this was found. And a website chat widget is ONE visitor's
 // session in the first place; a fresh tab per agent would be a less faithful model of the thing being
 // attacked, not a more isolated one.
