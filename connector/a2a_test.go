@@ -270,3 +270,19 @@ func TestA2AReadsCurrentSpecParts(t *testing.T) {
 		t.Errorf("reply = %q, want the text off a kind-keyed status message", got)
 	}
 }
+
+func TestA2ANotFoundIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("not found"))
+	}))
+	defer srv.Close()
+
+	_, err := NewA2A(srv.URL, Auth{Type: AuthNone}, loopbackClient()).Send(context.Background(), "payload")
+	if err == nil {
+		t.Fatal("404 must be an error")
+	}
+	if !strings.Contains(err.Error(), "HTTP 404") {
+		t.Errorf("expected HTTP 404 in error, got: %v", err)
+	}
+}

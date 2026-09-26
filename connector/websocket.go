@@ -121,7 +121,7 @@ func (w *WebSocket) Send(ctx context.Context, message string) (string, error) {
 			return "", fmt.Errorf("ws dial: %w", err)
 		}
 
-		deadline := time.Now().Add(w.timeout)
+		deadline := deadlineFor(ctx, w.timeout)
 		_ = conn.SetWriteDeadline(deadline)
 		if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 			w.reset()
@@ -176,7 +176,7 @@ func (w *WebSocket) SendWithoutAuth(ctx context.Context, message string) (string
 	}
 	defer conn.Close()
 
-	deadline := time.Now().Add(w.timeout)
+	deadline := deadlineFor(ctx, w.timeout)
 	_ = conn.SetWriteDeadline(deadline)
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 		return fmt.Sprintf("[WS ERROR] write: %v", err), nil
@@ -187,6 +187,14 @@ func (w *WebSocket) SendWithoutAuth(ctx context.Context, message string) (string
 		return fmt.Sprintf("[WS ERROR] read: %v", err), nil
 	}
 	return string(payload), nil
+}
+
+func deadlineFor(ctx context.Context, timeout time.Duration) time.Time {
+	deadline := time.Now().Add(timeout)
+	if dl, ok := ctx.Deadline(); ok && dl.Before(deadline) {
+		return dl
+	}
+	return deadline
 }
 
 func asAuth(err error, target **AuthError) bool {

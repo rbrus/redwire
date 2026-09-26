@@ -93,7 +93,19 @@ func newFakeChrome(t *testing.T, evalResult string) *fakeChrome {
 }
 
 func browserFor(f *fakeChrome, page string) *Browser {
-	return NewBrowser(BrowserConfig{Endpoint: page, CDPURL: f.srv.URL, ResponseTimeout: 2 * time.Second})
+	return NewBrowser(BrowserConfig{Endpoint: page, CDPURL: f.srv.URL, AllowPrivate: true, ResponseTimeout: 2 * time.Second})
+}
+
+func TestBrowserConnectorRefusesPrivateEndpointByDefault(t *testing.T) {
+	f := newFakeChrome(t, `{"ok":true,"reply":"hi","error":""}`)
+	b := NewBrowser(BrowserConfig{Endpoint: "http://127.0.0.1:8080/chat", CDPURL: f.srv.URL})
+	_, err := b.Send(context.Background(), "hello")
+	if err == nil {
+		t.Fatal("browser connector reached loopback without AllowPrivate")
+	}
+	if !strings.Contains(err.Error(), "Private/internal") {
+		t.Errorf("refused for wrong reason: %v", err)
+	}
 }
 
 func TestBrowserConnectorReturnsTheWidgetReply(t *testing.T) {

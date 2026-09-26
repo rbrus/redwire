@@ -171,3 +171,28 @@ func TestWebSocketSatisfiesTheTargetContract(t *testing.T) {
 		t.Fatalf("out=%q err=%v", out, err)
 	}
 }
+
+func TestWebSocketRespectsContextDeadline(t *testing.T) {
+	// A server that reads but never replies; a 50ms context deadline must abort quickly,
+	// rather than blocking for the 10s connection timeout.
+	url := wsServer(t, func(conn *websocket.Conn) {
+		_, _, _ = conn.ReadMessage()
+		time.Sleep(2 * time.Second)
+	})
+	ws := NewWebSocket(url, Auth{Type: AuthNone}, 10*time.Second, loopbackWSDialer())
+	defer ws.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := ws.Send(ctx, "hello")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if elapsed > 1*time.Second {
+		t.Errorf("Send took %v, want it bounded by context deadline (~50ms)", elapsed)
+	}
+}

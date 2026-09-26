@@ -91,6 +91,7 @@ func TestLiveBrowserConnectorDrivesARealWidget(t *testing.T) {
 
 	b := NewBrowser(BrowserConfig{
 		Endpoint:         srv.URL,
+		AllowPrivate:     true,
 		CDPURL:           cdp,
 		OpenSelector:     "#launcher",
 		DismissSelectors: []string{"#accept"},
@@ -129,6 +130,7 @@ func TestLiveBrowserConnectorAutoDetectsTheInput(t *testing.T) {
 
 	b := NewBrowser(BrowserConfig{
 		Endpoint:         srv.URL,
+		AllowPrivate:     true,
 		CDPURL:           cdp,
 		OpenSelector:     "#launcher",
 		DismissSelectors: []string{"#accept"},
@@ -157,7 +159,7 @@ func TestLiveBrowserConnectorRefusesAPageWithNoWidget(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	b := NewBrowser(BrowserConfig{Endpoint: srv.URL, CDPURL: cdp, ResponseTimeout: 5 * time.Second})
+	b := NewBrowser(BrowserConfig{Endpoint: srv.URL, AllowPrivate: true, CDPURL: cdp, ResponseTimeout: 5 * time.Second})
 	defer b.Close()
 
 	got, err := b.Send(context.Background(), "payload")

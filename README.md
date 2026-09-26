@@ -109,13 +109,27 @@ b := connector.NewBrowser(connector.BrowserConfig{
 reply, err := b.Send(ctx, payload)
 ```
 
+## CLI
+
+`redwire` includes a standalone CLI to interact with agents across all supported transports:
+
+```bash
+# List supported transports
+redwire transports
+
+# Send payload to an agent
+redwire send -transport rest -endpoint https://agent.example/chat -message "Hello agent"
+redwire send -transport mcp -endpoint https://agent.example/mcp -message "Run audit"
+redwire send -transport ws -endpoint wss://agent.example/ws -message "Ping"
+```
+
 ## Testing
 
 ```bash
 go test -race ./...
 ```
 
-86 tests plus a runnable example, roughly one line of test per line of code. They assert on *behaviour* — an httptest
+109 tests plus a runnable example, roughly one line of test per line of code. They assert on *behaviour* — an httptest
 target that returns a 502, a target that redirects to another host, a WebSocket that drops
 mid-conversation — not on struct internals. The browser connector's live test drives a real
 Chromium and skips loudly when `REDWIRE_CDP_URL` is unset, because that is the only thing that proves

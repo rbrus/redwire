@@ -25,6 +25,11 @@ func Example() {
 		}, nil),
 		"mcp": connector.NewMCP("https://agent.example/mcp", auth, nil),
 		"a2a": connector.NewA2A("https://agent.example/a2a", auth, nil),
+		"ws":  connector.NewWebSocket("wss://agent.example/ws", auth, 0),
+		"browser": connector.NewBrowser(connector.BrowserConfig{
+			Endpoint: "https://support.example/",
+			CDPURL:   "http://127.0.0.1:9222",
+		}),
 	}
 
 	send := func(t redwire.Target) (string, error) {
@@ -33,5 +38,5 @@ func Example() {
 	_ = send // wired the same way for every transport; not run here (no live endpoint).
 
 	fmt.Println(len(targets), "transports behind one interface")
-	// Output: 3 transports behind one interface
+	// Output: 5 transports behind one interface
 }

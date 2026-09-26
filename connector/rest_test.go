@@ -152,3 +152,39 @@ func asAuthError(err error, target **AuthError) bool {
 	}
 	return ok
 }
+
+func TestRESTSetSession(t *testing.T) {
+	var seen map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&seen)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"reply":"session ok"}`))
+	}))
+	defer srv.Close()
+
+	c := NewREST(Config{
+		Endpoint:        srv.URL,
+		Auth:            Auth{Type: AuthNone},
+		RequestMapping:  Mapping{MessageField: "input", SessionField: "session_id"},
+		ResponseMapping: Mapping{MessageField: "reply"},
+	}, loopbackClient())
+
+	c.SetSession("test-session-42")
+	out, err := c.Send(context.Background(), "ping")
+	if err != nil || out != "session ok" {
+		t.Fatalf("Send: %v, out: %q", err, out)
+	}
+	if seen["session_id"] != "test-session-42" {
+		t.Errorf("session field not sent: %v", seen)
+	}
+	if seen["input"] != "ping" {
+		t.Errorf("input field not sent: %v", seen)
+	}
+}
+
+func TestAuthErrorString(t *testing.T) {
+	ae := &AuthError{StatusCode: 401}
+	if got := ae.Error(); got != "HTTP 401 auth rejected" {
+		t.Errorf("AuthError.Error() = %q, want 'HTTP 401 auth rejected'", got)
+	}
+}

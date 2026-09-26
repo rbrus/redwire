@@ -221,3 +221,58 @@ func TestMCPSatisfiesTheTargetContract(t *testing.T) {
 		t.Fatalf("MCP should behave like any other transport: out=%q err=%v", out, err)
 	}
 }
+
+func TestMCPRateLimitIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	_, err := NewMCP(srv.URL, Auth{Type: AuthNone}, loopbackClient()).Send(context.Background(), "x")
+	if err == nil {
+		t.Fatal("429 must be an error")
+	}
+	if !strings.Contains(err.Error(), "rate-limited") {
+		t.Errorf("expected rate-limited in error, got: %v", err)
+	}
+}
+
+func TestMCPServerErrorIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	_, err := NewMCP(srv.URL, Auth{Type: AuthNone}, loopbackClient()).Send(context.Background(), "x")
+	if err == nil {
+		t.Fatal("500 must be an error")
+	}
+	if !strings.Contains(err.Error(), "HTTP 500") {
+		t.Errorf("expected HTTP 500 in error, got: %v", err)
+	}
+}
+
+func TestMCPSupportsSSEStream(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+			ID     string `json:"id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		w.Header().Set("Content-Type", "text/event-stream")
+		switch req.Method {
+		case "tools/list":
+			_, _ = w.Write([]byte("event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":\"" + req.ID + "\",\"result\":{\"tools\":[{\"name\":\"ask\",\"inputSchema\":{\"properties\":{\"query\":{}}}}]}}\n\n"))
+		case "tools/call":
+			_, _ = w.Write([]byte("event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":\"" + req.ID + "\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"sse stream reply\"}]}}\n\n"))
+		}
+	}))
+	defer srv.Close()
+
+	conn := NewMCP(srv.URL, Auth{Type: AuthNone}, loopbackClient())
+	out, err := conn.Send(context.Background(), "test query")
+	if err != nil {
+		t.Fatalf("SSE stream should be handled: %v", err)
+	}
+	if out != "sse stream reply" {
+		t.Errorf("got %q, want 'sse stream reply'", out)
+	}
+}

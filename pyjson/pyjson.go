@@ -83,7 +83,7 @@ func SpaceSeparators(s string) string {
 // what a Firestore field cap measures.
 //
 // Astral characters become surrogate pairs, matching Python: json.dumps writes an emoji as
-// 😀 rather than \U0001f600.
+// \ud83d\ude00 rather than \U0001f600.
 //
 // Safe to run over a whole JSON document: in valid JSON a non-ASCII byte can only occur inside a
 // string literal.

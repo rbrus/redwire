@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rbrus/redwire/ssrf"
 )
 
 // Browser reaches an agent that has no API: a chat widget bolted onto a web page. A support
@@ -109,6 +110,10 @@ func CloseAllBrowsers() {
 type BrowserConfig struct {
 	// Endpoint is the PAGE the widget lives on, not an API.
 	Endpoint string
+
+	// AllowPrivate permits navigating to private/internal endpoints (such as localhost in tests
+	// or on-prem environments). By default, SSRF validation blocks private addresses.
+	AllowPrivate bool
 
 	// CDPURL is the DevTools HTTP endpoint of a Chrome already running with
 	// --remote-debugging-port, e.g. http://127.0.0.1:9222. Required: this connector does not spawn
@@ -245,6 +250,16 @@ func (b *Browser) ensureSession(ctx context.Context) error {
 		return fmt.Errorf("browser connector needs a CDP URL (BrowserConfig.CDPURL) — the DevTools " +
 			"endpoint of a Chrome you run, e.g. http://127.0.0.1:9222 from " +
 			"`chromium --headless --remote-debugging-port=9222`. This connector does not spawn browsers")
+	}
+
+	if b.cfg.AllowPrivate {
+		if err := ssrf.ValidateScheme(b.cfg.Endpoint); err != nil {
+			return fmt.Errorf("browser: %w", err)
+		}
+	} else {
+		if err := ssrf.ValidatePublicURL(ctx, b.cfg.Endpoint); err != nil {
+			return fmt.Errorf("browser: %w", err)
+		}
 	}
 
 	key := b.cfg.CDPURL + "\x00" + b.cfg.Endpoint

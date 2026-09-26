@@ -66,9 +66,12 @@ func TestMetadataByNameIsRefusedToo(t *testing.T) {
 	withResolver(t, fakeResolver{addrs: ips("203.0.113.9")}) // even answering PUBLICLY
 	for _, host := range []string{
 		"http://metadata.google.internal/computeMetadata/v1/",
+		"http://metadata.google.internal./computeMetadata/v1/",
 		"http://localhost/",
+		"http://localhost./",
 		"http://LOCALHOST/",
 		"http://localhost.localdomain/",
+		"http://localhost.localdomain./",
 	} {
 		if err := ValidatePublicURL(context.Background(), host); err == nil {
 			t.Errorf("%s was allowed", host)
@@ -185,6 +188,27 @@ func TestTheClosedGapsDidNotSwallowNeighbouringPublicSpace(t *testing.T) {
 		withResolver(t, fakeResolver{addrs: ips(ip)})
 		if err := ValidatePublicURL(context.Background(), "https://agent.example.com/"); err != nil {
 			t.Errorf("%s is public space and was refused: %v", ip, err)
+		}
+	}
+}
+
+func TestValidateScheme(t *testing.T) {
+	for _, tc := range []struct {
+		url     string
+		schemes []string
+		wantErr bool
+	}{
+		{"http://127.0.0.1:8080/chat", nil, false},
+		{"https://10.0.0.1/chat", nil, false},
+		{"wss://localhost:8080/ws", []string{"ws", "wss"}, false},
+		{"ftp://example.com/", nil, true},
+		{"file:///etc/passwd", nil, true},
+		{"not-a-url", nil, true},
+		{"http://", nil, true},
+	} {
+		err := ValidateScheme(tc.url, tc.schemes...)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("ValidateScheme(%q, %v) err = %v, wantErr = %v", tc.url, tc.schemes, err, tc.wantErr)
 		}
 	}
 }

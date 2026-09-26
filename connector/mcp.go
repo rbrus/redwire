@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -26,6 +28,7 @@ type MCP struct {
 	endpoint string
 	auth     Auth
 	client   *http.Client
+	mu       sync.Mutex
 	tools    []MCPTool
 	nextID   int
 }
@@ -59,8 +62,12 @@ const mcpProtocolVersion = "2026-07-28"
 // reach a modern one, so they go on unconditionally. Mcp-Name is omitted when there is no target,
 // because an empty routing key is not the same as "route the search tool".
 func (m *MCP) rpc(ctx context.Context, method, name string, params any) (json.RawMessage, error) {
+	m.mu.Lock()
 	m.nextID++
-	body := map[string]any{"jsonrpc": "2.0", "id": fmt.Sprint(m.nextID), "method": method}
+	id := m.nextID
+	m.mu.Unlock()
+
+	body := map[string]any{"jsonrpc": "2.0", "id": fmt.Sprint(id), "method": method}
 	if params != nil {
 		body["params"] = params
 	}
@@ -100,6 +107,24 @@ func (m *MCP) rpc(ctx context.Context, method, name string, params any) (json.Ra
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return nil, &AuthError{StatusCode: resp.StatusCode}
 	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("mcp %s: target rate-limited the scan (HTTP %d)", method, resp.StatusCode)
+	}
+	if resp.StatusCode >= 500 {
+		return nil, fmt.Errorf("mcp %s: target returned HTTP %d", method, resp.StatusCode)
+	}
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
+		return nil, fmt.Errorf("mcp %s: target returned HTTP %d: no agent answers at this endpoint", method, resp.StatusCode)
+	}
+
+	// Streamable HTTP allows the server to stream the JSON-RPC reply over SSE.
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") ||
+		bytes.HasPrefix(bytes.TrimSpace(payload), []byte("event:")) ||
+		bytes.HasPrefix(bytes.TrimSpace(payload), []byte("data:")) {
+		if sseData := extractSSEData(payload); len(sseData) > 0 {
+			payload = sseData
+		}
+	}
 
 	var envelope struct {
 		Result json.RawMessage `json:"result"`
@@ -118,6 +143,19 @@ func (m *MCP) rpc(ctx context.Context, method, name string, params any) (json.Ra
 	return envelope.Result, nil
 }
 
+// extractSSEData extracts the JSON payload from an SSE data line.
+func extractSSEData(raw []byte) []byte {
+	var lastData []byte
+	lines := bytes.Split(raw, []byte("\n"))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if bytes.HasPrefix(line, []byte("data:")) {
+			lastData = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		}
+	}
+	return lastData
+}
+
 // DiscoverTools lists the tools the server exposes, caching them for Send.
 func (m *MCP) DiscoverTools(ctx context.Context) ([]MCPTool, error) {
 	result, err := m.rpc(ctx, "tools/list", "", nil)
@@ -130,8 +168,11 @@ func (m *MCP) DiscoverTools(ctx context.Context) ([]MCPTool, error) {
 	if len(result) > 0 {
 		_ = json.Unmarshal(result, &listed)
 	}
+	m.mu.Lock()
 	m.tools = listed.Tools
-	return m.tools, nil
+	tools := append([]MCPTool(nil), m.tools...)
+	m.mu.Unlock()
+	return tools, nil
 }
 
 // preferredArgNames is the priority order for guessing which argument carries the prompt.
@@ -183,7 +224,10 @@ func (m *MCP) CallTool(ctx context.Context, name string, args map[string]any) (s
 // available tool with the payload as its input — a tool is the only surface an MCP server exposes
 // to talk to.
 func (m *MCP) Send(ctx context.Context, message string) (string, error) {
-	if len(m.tools) == 0 {
+	m.mu.Lock()
+	hasTools := len(m.tools) > 0
+	m.mu.Unlock()
+	if !hasTools {
 		if _, err := m.DiscoverTools(ctx); err != nil {
 			return "", err
 		}
@@ -195,11 +239,14 @@ func (m *MCP) Send(ctx context.Context, message string) (string, error) {
 	//
 	// It is the same defect as a REST reply read from a key that is not there, in a second connector,
 	// and it was found by adding one honest row to go/acceptance rather than by reading this code.
+	m.mu.Lock()
 	if len(m.tools) == 0 {
+		m.mu.Unlock()
 		return "", fmt.Errorf("mcp: the endpoint answered but exposes no tools, so there is nothing " +
 			"to deliver a payload to — this is not an agent that refused, it is an agent we never reached")
 	}
 	tool := m.tools[0]
+	m.mu.Unlock()
 	return m.CallTool(ctx, tool.Name, map[string]any{ArgNameFor(tool.InputSchema): message})
 }
 

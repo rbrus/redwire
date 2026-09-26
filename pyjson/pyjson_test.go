@@ -50,3 +50,48 @@ func TestDumpsRoundTrips(t *testing.T) {
 		t.Errorf("Dumps = %q, %v", got, err)
 	}
 }
+
+func TestEnsureASCII(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want string
+	}{
+		{"hello world", "hello world"},
+		{"café", `caf\u00e9`},
+		{"😀", `\ud83d\ude00`},
+		{"prompt: <script>alert('é')</script> 🎉", `prompt: <script>alert('\u00e9')</script> \ud83c\udf89`},
+	} {
+		if got := EnsureASCII(tc.in); got != tc.want {
+			t.Errorf("EnsureASCII(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestIsASCII(t *testing.T) {
+	if !isASCII("ascii only!") {
+		t.Errorf("isASCII returned false for ASCII string")
+	}
+	if isASCII("non-ascii: 😀") {
+		t.Errorf("isASCII returned true for non-ASCII string")
+	}
+}
+
+func TestMarshal(t *testing.T) {
+	// Marshal must:
+	// 1. Not escape HTML characters (<, >, &).
+	// 2. Escape non-ASCII runes (surrogate pairs for astral characters).
+	// 3. Use Python-style separators (", " and ": ").
+	val := map[string]any{
+		"prompt": "<a> & 'b'",
+		"emoji":  "😀",
+	}
+	got, err := Marshal(val)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	// Go sorts map keys, so "emoji" comes before "prompt"
+	want := `{"emoji": "\ud83d\ude00", "prompt": "<a> & 'b'"}`
+	if got != want {
+		t.Errorf("Marshal = %q, want %q", got, want)
+	}
+}

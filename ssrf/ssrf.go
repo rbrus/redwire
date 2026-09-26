@@ -119,7 +119,8 @@ func ValidatePublicURL(ctx context.Context, raw string, allowedSchemes ...string
 		return checkIP(ip)
 	}
 
-	if blockedHosts[strings.ToLower(host)] {
+	normHost := strings.TrimRight(strings.ToLower(host), ".")
+	if blockedHosts[normHost] {
 		return fail("This hostname is not allowed.")
 	}
 	addrs, err := DefaultResolver.LookupIPAddr(ctx, host)

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +35,7 @@ type A2A struct {
 	endpoint string
 	auth     Auth
 	client   *http.Client
+	mu       sync.Mutex
 	taskID   string
 	// dialect is pinned after the first successful send; serverTaskID is the 0.3 task the server
 	// named, which keeps a multi-turn conversation one task.
@@ -85,24 +87,33 @@ const rpcMethodNotFound = -32601
 // spec, and only a -32601 — the server saying it does not know that method — earns a retry on the
 // older one. Any other failure is the target's answer and is returned as it always was.
 func (a *A2A) Send(ctx context.Context, message string) (string, error) {
+	a.mu.Lock()
 	if a.taskID == "" {
 		a.taskID = uuid.NewString()
 	}
-
 	dialect := a.dialect
+	a.mu.Unlock()
+
 	if dialect == a2aAuto {
 		dialect = a2aV03
 	}
 	result, code, err := a.send(ctx, dialect, message)
 	if err == nil {
+		a.mu.Lock()
 		a.dialect = dialect
+		a.mu.Unlock()
 		return result, nil
 	}
+	a.mu.Lock()
+	curDialect := a.dialect
+	a.mu.Unlock()
 	// Only an unnegotiated connector retries, and only on the one code that means the verb was wrong.
-	if a.dialect == a2aAuto && dialect == a2aV03 && code == rpcMethodNotFound {
+	if curDialect == a2aAuto && dialect == a2aV03 && code == rpcMethodNotFound {
 		result, _, retryErr := a.send(ctx, a2aV02, message)
 		if retryErr == nil {
+			a.mu.Lock()
 			a.dialect = a2aV02
+			a.mu.Unlock()
 			return result, nil
 		}
 		return "", retryErr
@@ -141,6 +152,10 @@ func (a *A2A) send(ctx context.Context, dialect a2aDialect, message string) (str
 	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
 		return "", 0, fmt.Errorf("a2a: target returned HTTP %d", resp.StatusCode)
 	}
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
+		return "", 0, fmt.Errorf("a2a: target returned HTTP %d: no agent answers %s at this endpoint — %s",
+			resp.StatusCode, req.Method, truncate(string(payload), 300))
+	}
 
 	var envelope struct {
 		Result json.RawMessage `json:"result"`
@@ -162,9 +177,11 @@ func (a *A2A) send(ctx context.Context, dialect a2aDialect, message string) (str
 		code := 0
 		if envelope.Error != nil {
 			code = envelope.Error.Code
+			return "", code, fmt.Errorf("a2a: target returned JSON-RPC error %d: %s",
+				envelope.Error.Code, envelope.Error.Message)
 		}
-		return "", code, fmt.Errorf("a2a: target replied 200 with no `result` in the envelope, so it did not "+
-			"answer as an A2A agent — check the endpoint: %s", truncate(string(payload), 300))
+		return "", code, fmt.Errorf("a2a: target replied HTTP %d with no `result` in the envelope, so it did not "+
+			"answer as an A2A agent — check the endpoint: %s", resp.StatusCode, truncate(string(payload), 300))
 	}
 	// 0.3 assigns the task id server-side, so it is read from the reply rather than minted here. It
 	// is what keeps a multi-turn conversation one task, which is the whole point of the field.
@@ -174,6 +191,11 @@ func (a *A2A) send(ctx context.Context, dialect a2aDialect, message string) (str
 
 // body builds the request for one dialect.
 func (a *A2A) body(dialect a2aDialect, message string) map[string]any {
+	a.mu.Lock()
+	taskID := a.taskID
+	serverTaskID := a.serverTaskID
+	a.mu.Unlock()
+
 	if dialect == a2aV02 {
 		// Byte-for-byte what this connector has always sent, so nothing about a 0.2 target changes.
 		return map[string]any{
@@ -181,7 +203,7 @@ func (a *A2A) body(dialect a2aDialect, message string) map[string]any {
 			"id":      uuid.NewString(),
 			"method":  "tasks/send",
 			"params": map[string]any{
-				"id": a.taskID,
+				"id": taskID,
 				"message": map[string]any{
 					"role":  "user",
 					"parts": []map[string]any{{"type": "text", "text": message}},
@@ -196,8 +218,8 @@ func (a *A2A) body(dialect a2aDialect, message string) map[string]any {
 	}
 	// Only after the server has named the task: a client-minted id is 0.2 semantics and a 0.3 server
 	// answers "task not found" to one it never issued.
-	if a.serverTaskID != "" {
-		msg["taskId"] = a.serverTaskID
+	if serverTaskID != "" {
+		msg["taskId"] = serverTaskID
 	}
 	return map[string]any{
 		"jsonrpc": "2.0",
@@ -209,6 +231,8 @@ func (a *A2A) body(dialect a2aDialect, message string) map[string]any {
 
 // rememberTask captures the server's task id from a reply, so the next turn continues it.
 func (a *A2A) rememberTask(rawResult json.RawMessage) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if a.serverTaskID != "" {
 		return
 	}
